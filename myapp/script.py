@@ -40,3 +40,5 @@ def import_flights(file_path):
 if __name__ == '__main__':
     csv_file_path = r"C:\Users\99888\Flight\db\flight_dataset.csv"
     import_flights(csv_file_path)
+
+
