@@ -1,22 +1,14 @@
 from django.db import models
 
-class Flight(models.Model):
-    airline = models.CharField(max_length=64)
-    source = models.CharField(max_length=100)
-    destination = models.CharField(max_length=100)
-    total_stops = models.IntegerField()
-    price = models.IntegerField()
-    date = models.IntegerField()
-    month = models.IntegerField()
-    year = models.IntegerField()
-    dep_hours = models.IntegerField()
-    dep_min = models.IntegerField()
-    arrival_hours = models.IntegerField()
-    arrival_min = models.IntegerField()
-    duration_hours = models.IntegerField()
-    duration_min = models.IntegerField()
 
-    def __str__(self):
-        return f"{self.airline} flight from {self.source} to {self.destination}"
-    
+
+class Flight(models.Model):
+    legId = models.CharField(max_length=100, primary_key=True)
+    destinationAirport = models.CharField(max_length=100)
+    totalFare = models.DecimalField(max_digits=10, decimal_places=2)
+    segmentsArrivalTimeEpochSeconds = models.IntegerField()
+    segmentsDepartureTimeEpochSeconds = models.IntegerField()
+    segmentsArrivalAirportCode = models.CharField(max_length=100)
+    segmentsDepartureAirportCode = models.CharField(max_length=100)
+    segmentsAirlineName = models.CharField(max_length=100)
     
