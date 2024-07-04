@@ -2,7 +2,7 @@ import os
 import sys
 import django
 from django.db.models import Min
-
+import random
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
@@ -37,6 +37,16 @@ def find_flights(origin, origin_key, departure_after, max_day_flight):
 
 
 
+def check_flight(flight_id,flight_place,place):
+        if flight_id[place]== 0:
+            return
+        check_flight(flight_id,flight_place,flight_place[place])
+        cheap_flight = Flight.objects.all().filter(legId=flight_id[place]).first()
+        print(cheap_flight)
+        
+        return
+
+
 
 def engine(origin, destination, departure_after, max_day_flight, max_stop):
     price = 0
@@ -45,9 +55,11 @@ def engine(origin, destination, departure_after, max_day_flight, max_stop):
     new_flights = find_flights(origin, '', departure_after, max_day_flight)
     flight_list =[]
     flight_list_price =[0.0]
-    flight_id =[]
+    flight_id =[0]
     flight_place =[-1]
     flight_list.append(new_flights)
+    
+
     i = 0
     cheap_flight_place = 0
 
@@ -57,28 +69,34 @@ def engine(origin, destination, departure_after, max_day_flight, max_stop):
     
     
    
-    
-
+    cheap_flight_place = 0
     try:
-        while cheap_flight.segmentsArrivalAirportCode != destination and i < 100:
+        while cheap_flight.segmentsArrivalAirportCode != destination and i < 1000:
+            
+            cheap_flight_place_old = cheap_flight_place
             new_flights = find_flights(
                 cheap_flight.segmentsArrivalAirportCode,
                 cheap_flight.legId,
                 cheap_flight.segmentsArrivalTimeEpochSeconds,
                 max_day_flight
             )
+            print(new_flights.all().count())
             flight_list.append(new_flights)
             
             i += 1
             flight_list_price.append(float(cheap_flight.totalFare) + flight_list_price[cheap_flight_place])
-            flight_id.append(cheap_flight.legId)
-            flight_place.append(cheap_flight_place)
+            #flight_id.append(cheap_flight.legId)
+            #flight_place.append(cheap_flight_place)
             cheap_price = float('inf')
             
             
             for j, flight_queryset in enumerate(flight_list):
                 if flight_queryset.exists():
-                    first_flight = flight_queryset.order_by('totalFare').first()
+                    min_total_fare = flight_queryset.aggregate(Min('totalFare'))['totalFare__min']
+
+                        # Get the first flight with the minimum totalFare
+                    first_flight = flight_queryset.filter(totalFare=min_total_fare).first()
+                    
                     if first_flight.totalFare < cheap_price:
                         cheap_flight = first_flight
                         cheap_price = first_flight.totalFare
@@ -94,25 +112,30 @@ def engine(origin, destination, departure_after, max_day_flight, max_stop):
             
     except Exception as e:
         print(f"Error: {e}")
-    print(float(cheap_flight.totalFare) + flight_list_price[cheap_flight_place]) 
-    
-    print(cheap_flight)
-    cheap_flight = Flight.objects.all().filter(legId=flight_id[i-1]).first()
-    print(cheap_flight)
-    place = flight_place[i-1]
-    while cheap_flight.segmentsDepartureAirportCode != origin:
-        place = flight_place[place]
-        cheap_flight = Flight.objects.all().filter(legId=flight_id[place]).first()
-        print(cheap_flight)
 
-        
-        
-          
+       
+    if cheap_flight:
+        print(float(cheap_flight.totalFare) + flight_list_price[cheap_flight_place]) 
+    
+           
+
+    
+        # print(flight_id)
+        # print(flight_place)
+        # print(cheap_flight_place_old)
+        check_flight(flight_id,flight_place,cheap_flight_place_old+1)
+        print(cheap_flight) 
+
 
     return flight_list
 
-engine("CLT", "ATL", 1650895080, 3, 0)
 
-print("hi")
 
+distinct_departure_airports = Flight.objects.values_list('segmentsDepartureAirportCode', flat=True).distinct()
+
+# Convert the queryset to a list (optional)
+distinct_departure_airport_list = list(distinct_departure_airports)
+print(len(distinct_departure_airport_list))
+
+engine(distinct_departure_airport_list[int(random.randint(0, 115))], distinct_departure_airport_list[int(random.randint(0, 115))], 1650895080, 3, 0)
 
