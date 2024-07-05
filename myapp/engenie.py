@@ -3,6 +3,11 @@ import sys
 import django
 from django.db.models import Min
 import random
+import time
+from django.db.models import Avg
+
+from statistics import mean ,pstdev
+
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
@@ -10,132 +15,172 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "flight.settings")
 django.setup()
 from myapp.models import Flight
 
-def find_flights(origin, origin_key, departure_after, max_day_flight):
-    """
-    Filters flights based on origin, departure time, and max duration.
 
-    Args:
-        origin: The departure airport code (string).
-        departure_after: A timestamp in seconds since epoch (integer).
-        max_day_flight: Maximum allowed flight duration in days (integer).
-
-    Returns:
-        A queryset of flights matching the criteria.
-    """
-    flights = Flight.objects.filter(
-        segmentsDepartureAirportCode=origin,
-        segmentsDepartureTimeEpochSeconds__gt=departure_after,
-        segmentsArrivalTimeEpochSeconds__lt=max_day_flight
-    )
+def find_path(flight, origin,flight_list,cost):
+    
+    
     
 
-   
-          
+    if flight.segmentsDepartureAirportCode == origin:
+        print(f"cost :{cost + flight.totalFare}")
+        print(flight)
+        return 
+    
+    cost += flight.totalFare
+    for flights in flight_list:
+        if flights.legId ==  flight.legIdBack:
+            new_flight = flights
+    find_path(new_flight,origin,flight_list,cost)
 
-    return flights
-
-
-
-
-def check_flight(flight_id,flight_place,place):
-        if flight_id[place]== 0:
-            return
-        check_flight(flight_id,flight_place,flight_place[place])
-        cheap_flight = Flight.objects.all().filter(legId=flight_id[place]).first()
-        print(cheap_flight)
-        
-        return
+    
+    print(flight)
+    return 
 
 
+def find_flights(origin,destamation, departure_after, max_day_flight,legIdBack,maxFlightBack,max_stop):
+    if maxFlightBack+1 ==  max_stop:
+        flights = Flight.objects.filter(
+        segmentsDepartureAirportCode=origin,
+        segmentsArrivalAirportCode= destamation,
+        segmentsDepartureTimeEpochSeconds__gt=departure_after,
+        segmentsArrivalTimeEpochSeconds__lt=departure_after + max_day_flight * 86400
+    )
+    else: 
+        flights = Flight.objects.filter(
+        segmentsDepartureAirportCode=origin,
+        segmentsDepartureTimeEpochSeconds__gt=departure_after,
+        segmentsArrivalTimeEpochSeconds__lt=departure_after + max_day_flight * 86400
+    )
+    if legIdBack != 0:
+        for flight in flights:
+            flight.legIdBack =legIdBack
+            flight.maxFlightBack = maxFlightBack+1
+
+    
+
+    if legIdBack == 0 and flights.exists()== False:    
+        return None 
+
+
+
+
+
+    return list(flights)
+
+# def check_flight(flight_id, flight_place, place):
+#     if flight_id[place] == 0:
+#         return
+#     check_flight(flight_id, flight_place, flight_place[place])
+#     cheap_flight = Flight.objects.filter(legId=flight_id[place]).first()
+#     print(cheap_flight)
+#     return
 
 def engine(origin, destination, departure_after, max_day_flight, max_stop):
     price = 0
-    max_day_flight += departure_after + max_day_flight * 86400
     
-    new_flights = find_flights(origin, '', departure_after, max_day_flight)
-    flight_list =[]
-    flight_list_price =[0.0]
-    flight_id =[0]
-    flight_place =[-1]
-    flight_list.append(new_flights)
-    
+    new_flights = find_flights(origin,destination, departure_after, max_day_flight,0,0,max_stop)
+    flight_list = []
+    flight_remove_list =[]
+    flight_list.extend(new_flights)
 
     i = 0
     cheap_flight_place = 0
 
-    
-    
-    cheap_flight = flight_list[0].order_by('totalFare').first()
-    
-    
-   
-    cheap_flight_place = 0
     try:
-        while cheap_flight.segmentsArrivalAirportCode != destination and i < 1000:
+        t0 = time.time()
+        
+        while i == 0 or ( i < 10000 and    cheap_flight.segmentsArrivalAirportCode != destination ):
+            check_exist = False
+            cheap_price = float('inf')  # Initialize with a high value
+            cheap_flight = None         # Initialize the variable to store the cheapest flight
             
-            cheap_flight_place_old = cheap_flight_place
-            new_flights = find_flights(
-                cheap_flight.segmentsArrivalAirportCode,
-                cheap_flight.legId,
-                cheap_flight.segmentsArrivalTimeEpochSeconds,
-                max_day_flight
-            )
-            print(new_flights.all().count())
-            flight_list.append(new_flights)
+            cheap_flight_place_old = -1  # Initialize to store the index of the cheapest flight
             
-            i += 1
-            flight_list_price.append(float(cheap_flight.totalFare) + flight_list_price[cheap_flight_place])
-            #flight_id.append(cheap_flight.legId)
-            #flight_place.append(cheap_flight_place)
-            cheap_price = float('inf')
-            
-            
-            for j, flight_queryset in enumerate(flight_list):
-                if flight_queryset.exists():
-                    min_total_fare = flight_queryset.aggregate(Min('totalFare'))['totalFare__min']
-
-                        # Get the first flight with the minimum totalFare
-                    first_flight = flight_queryset.filter(totalFare=min_total_fare).first()
-                    
-                    if first_flight.totalFare < cheap_price:
-                        cheap_flight = first_flight
-                        cheap_price = first_flight.totalFare
-                        cheap_flight_place = j
-                        # Remove the flight from the queryset
-                        flight_list[j] = flight_queryset.exclude(legId=cheap_flight.legId)
-            
-            if cheap_flight:
-                cheap_flight_destination = cheap_flight.segmentsArrivalAirportCode
+            # Iterate over the flight list to find the cheapest flight
+            for index, flight in enumerate(flight_list):
                
-            else:
-                break  # No more flights found
+                
+                if flight.idCheck != True:
+                    if flight.totalFare < cheap_price :
+                        check_exist = True
+                        cheap_flight = flight
+                        cheap_flight_place_old = index
             
+            if  cheap_flight == None:
+                i = 1000000
+                break
+            if cheap_flight_place_old != -1:  # Ensure a valid index
+                flight_list[cheap_flight_place_old].idCheck= True
+            
+            
+            new_flights = find_flights(
+                    cheap_flight.segmentsArrivalAirportCode,
+                    destination,
+                    cheap_flight.segmentsArrivalTimeEpochSeconds,
+                    max_day_flight,
+                    cheap_flight.legId,
+                    cheap_flight.maxFlightBack,
+                    max_stop
+
+                )
+            # print(cheap_flight.legId )
+            # print(cheap_flight.legIdBack )
+           
+            flight_list.extend(new_flights)
+
+           
+            i += 1
+        t1 = time.time()
+        if i > 100 and cheap_flight:
+        #     print(i)
+            #print(t1-t0)
+            print('',end= '')
     except Exception as e:
         print(f"Error: {e}")
-
-       
-    if cheap_flight:
-        print(float(cheap_flight.totalFare) + flight_list_price[cheap_flight_place]) 
+        raise
+    if cheap_flight == None:
+        print("there is no flight")
+    elif(cheap_flight.segmentsArrivalAirportCode == destination):
+        print('',end='')
+        #find_path(cheap_flight, origin,flight_list,0)
     
-           
-
-    
-        # print(flight_id)
-        # print(flight_place)
-        # print(cheap_flight_place_old)
-        check_flight(flight_id,flight_place,cheap_flight_place_old+1)
-        print(cheap_flight) 
-
-
+    else:
+        print("can not find")    
+        return -1
     return flight_list
 
 
 
+
+
+
 distinct_departure_airports = Flight.objects.values_list('segmentsDepartureAirportCode', flat=True).distinct()
-
-# Convert the queryset to a list (optional)
 distinct_departure_airport_list = list(distinct_departure_airports)
-print(len(distinct_departure_airport_list))
+not_find =0
+time_list =[]
+for i in range(100):
+    a = distinct_departure_airport_list[random.randint(0, len(distinct_departure_airport_list) - 1)]
+    b = distinct_departure_airport_list[random.randint(0, len(distinct_departure_airport_list) - 1)]
 
-engine(distinct_departure_airport_list[int(random.randint(0, 115))], distinct_departure_airport_list[int(random.randint(0, 115))], 1650895080, 3, 0)
+    #print(a + " " + b)
+    num = random.randint(1650058870,1664919670)
+    while find_flights(a,b, num, 3,0,-1,10)== None:
+        
+        num = random.randint(1650058870,1664919670)
+        
+    flight = find_flights(a,b, num, 3,0,-1,10)
+    # print(len(flight))
+    # print(a +" " +b)
+    # print(f"depart after:{num}")
+    t0 = time.time()
+    if(engine(a, b, num, 3, 3) == -1):
+        not_find+=1
+    t1 = time.time()
+    time_list.append(t1-t0)
+     
+
+print(not_find)
+print(mean(time_list) )
+print(pstdev(time_list) )
+
 

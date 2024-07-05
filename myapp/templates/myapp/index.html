@@ -1,10 +1,39 @@
-{% extends "myapp/layout.html" %}
+{% extends "myapp/base.html" %}
+
+
 
 {% block body %}
-    <h1>Flights:</h1>
-    <ul>
-        {% for flight in flights %}
-            <li>Flight {{ flight.id }}</li>
-        {% endfor %}
-    </ul>
+  <label for="arrival-airport">Choose an Arrival airport:</label>
+  <select id="arrival-airport" style="width: 100%"></select>
+
+  <script>
+    $(document).ready(function() {
+      $('#arrival-airport').select2({
+        ajax: {
+          url: '{% url "get_airports" %}',
+          dataType: 'json',
+          delay: 250,
+          data: function (params) {
+            return {
+              q: params.term,
+              page: params.page || 1
+            };
+          },
+          processResults: function (data, params) {
+            params.page = params.page || 1;
+            return {
+              results: data.results,
+              pagination: {
+                more: (params.page * 20) < data.total_count
+              }
+            };
+          },
+          cache: true
+        },
+        placeholder: 'Select an airport',
+        minimumInputLength: 1,
+        allowClear: true
+      });
+    });
+  </script>
 {% endblock %}

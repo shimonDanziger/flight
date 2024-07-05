@@ -10,5 +10,8 @@ from .models import Flight
 def index(request):
     return render(request, "myapp/index.html", {
 
-        "flights": Flight.objects.all()
-    })
+        "flights_depart": list(Flight.objects.values_list('segmentsDepartureAirportCode', flat=True).distinct()),
+        "flights_arrival": list(Flight.objects.values_list('segmentsArrivalAirportCode', flat=True).distinct())
+
+
+    })  
